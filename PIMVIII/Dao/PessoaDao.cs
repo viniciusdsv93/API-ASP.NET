@@ -5,9 +5,9 @@ namespace PIMVIII.Dao
 {
     public class PessoaDao
     {
-        string conexao = "Data Source=DESKTOP-EBOL8CS;Initial Catalog=pessoas;Integrated Security=True";
+        string conexao = "Data Source=DESKTOP-EBOL8CS;Initial Catalog=pessoas2;Integrated Security=True";
 
-        public List<Pessoa> ObterPessoas()
+        public List<Pessoa> BuscarPessoas()
         {
             List<Pessoa> pessoas = new List<Pessoa>();
 
@@ -38,7 +38,35 @@ namespace PIMVIII.Dao
             return pessoas;
         }
 
-        public void InserirPessoa(PessoaEnderecoTelefone pessoa)
+        public Pessoa BuscarPessoaPorCpf(Int64 cpf)
+        {
+            var pessoa = new Pessoa();
+
+            using (SqlConnection conn = new SqlConnection(conexao))
+            {
+                conn.Open();
+                using (SqlCommand cmd = new SqlCommand("SELECT * FROM tb_pessoas WHERE Cpf = " + cpf, conn))
+                {
+                    cmd.CommandType = System.Data.CommandType.Text;
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader != null)
+                        {
+                            while (reader.Read())
+                            {
+                                pessoa.Id = (int?)reader["Id"];
+                                pessoa.Nome = reader["Nome"].ToString();
+                                pessoa.Cpf = (long?)reader["Cpf"];
+                                pessoa.EnderecoId = (int?)reader["EnderecoId"];
+                            }
+                        }
+                    }
+                }
+            }
+            return pessoa;
+        }
+
+        public int InserirPessoa(PessoaEnderecoTelefone pessoa)
         {
             int tipoTelefoneId = -1;
             int pessoaId = -1;
@@ -58,6 +86,26 @@ namespace PIMVIII.Dao
 
                 try
                 {
+                    command.CommandText = "SELECT * FROM tb_pessoas WHERE Cpf = @CPF";
+                    command.Parameters.AddWithValue("CPF", pessoa.Cpf);
+                    SqlDataReader readerPessoa = command.ExecuteReader();
+
+                    if (readerPessoa != null)
+                    {
+                        while (readerPessoa.Read())
+                        {
+                            pessoaId = (int)readerPessoa["Id"];
+                        }
+                        readerPessoa.Close();
+                        readerPessoa.Dispose();
+                    }
+
+                    if (pessoaId != -1)
+                    {
+                        pessoaId = -1;
+                        throw new Exception("CPF já cadastrado");
+                    }
+
                     command.CommandText = "SELECT * FROM tb_tipos_telefone WHERE Tipo = @TIPOTELEFONE";
                     command.Parameters.AddWithValue("TIPOTELEFONE", pessoa.TipoTelefone);
                     SqlDataReader reader = command.ExecuteReader();
@@ -79,11 +127,29 @@ namespace PIMVIII.Dao
                         tipoTelefoneId = (int)command.ExecuteScalar();
                     }
 
-                    command.CommandText = "INSERT INTO tb_telefones (Numero, Ddd, TipoTelefoneId) output INSERTED.ID VALUES (@NUMEROTELEFONE, @DDD, @TIPOTELEFONEID)";
+                    command.CommandText = "SELECT * FROM tb_telefones WHERE Numero = @NUMEROTELEFONE AND Ddd = @DDD";
                     command.Parameters.AddWithValue("NUMEROTELEFONE", pessoa.NumeroTelefone);
                     command.Parameters.AddWithValue("DDD", pessoa.Ddd);
-                    command.Parameters.AddWithValue("TIPOTELEFONEID", tipoTelefoneId);
-                    telefoneId = (int)command.ExecuteScalar();
+                    SqlDataReader readerTelefone = command.ExecuteReader();
+
+                    if (readerTelefone != null)
+                    {
+                        while (readerTelefone.Read())
+                        {
+                            telefoneId = (int)readerTelefone["Id"];
+                        }
+                        readerTelefone.Close();
+                        readerTelefone.Dispose();
+                    }
+
+                    if (telefoneId == -1)
+                    {
+                        command.CommandText = "INSERT INTO tb_telefones (Numero, Ddd, TipoTelefoneId) output INSERTED.ID VALUES (@NUMEROTELEFONEINSERT, @DDDINSERT, @TIPOTELEFONEID)";
+                        command.Parameters.AddWithValue("NUMEROTELEFONEINSERT", pessoa.NumeroTelefone);
+                        command.Parameters.AddWithValue("DDDINSERT", pessoa.Ddd);
+                        command.Parameters.AddWithValue("TIPOTELEFONEID", tipoTelefoneId);
+                        telefoneId = (int)command.ExecuteScalar();
+                    }
 
                     command.CommandText = "INSERT INTO tb_enderecos (Logradouro, Numero, Cep, Bairro, Cidade, Estado) output INSERTED.ID VALUES (@LOGRADOURO, @NUMERO, @CEP, @BAIRRO, @CIDADE, @ESTADO)";
                     command.Parameters.AddWithValue("LOGRADOURO", pessoa.Logradouro);
@@ -94,10 +160,10 @@ namespace PIMVIII.Dao
                     command.Parameters.AddWithValue("ESTADO", pessoa.Estado);
                     enderecoId = (int)command.ExecuteScalar();
 
-                    command.CommandText = "INSERT INTO tb_pessoas (Nome, Cpf, EnderecoId) output INSERTED.ID VALUES (@NOME, @CPF, @ENDERECOID)";
+                    command.CommandText = "INSERT INTO tb_pessoas (Nome, Cpf, EnderecoId) output INSERTED.ID VALUES (@NOME, @CPFINSERT, @ENDERECOID)";
                     command.CommandType = System.Data.CommandType.Text;
                     command.Parameters.AddWithValue("NOME", pessoa.Nome);
-                    command.Parameters.AddWithValue("CPF", pessoa.Cpf);
+                    command.Parameters.AddWithValue("CPFINSERT", pessoa.Cpf);
                     command.Parameters.AddWithValue("ENDERECOID", enderecoId);
                     pessoaId = (int)command.ExecuteScalar();
 
@@ -107,6 +173,7 @@ namespace PIMVIII.Dao
                     command.ExecuteScalar();
 
                     transaction.Commit();
+                    return pessoaId;
                 }
                 catch (Exception ex)
                 {
@@ -122,15 +189,16 @@ namespace PIMVIII.Dao
                         Console.WriteLine("Rollback Exception Type: {0}", ex2.GetType());
                         Console.WriteLine("  Message: {0}", ex2.Message);
                     }
+                    return pessoaId;
                 }
 
 
                 //using (SqlCommand cmd = new SqlCommand("SELECT * FROM tb_tipos_telefone WHERE Tipo = @TIPOTELEFONE ", conn))
                 //{
-                //    cmd.CommandType = System.Data.CommandType.Text;
-                //    cmd.Parameters.AddWithValue("TIPOTELEFONE", pessoa.TipoTelefone);
-                //    SqlDataReader reader = cmd.ExecuteReader();
-                    
+                //cmd.CommandType = System.Data.CommandType.Text;
+                //cmd.Parameters.AddWithValue("TIPOTELEFONE", pessoa.TipoTelefone);
+                //SqlDataReader reader = cmd.ExecuteReader();
+
                 //    if (reader != null)
                 //    {
                 //        while (reader.Read())
@@ -189,6 +257,50 @@ namespace PIMVIII.Dao
                 //    cmd.Parameters.AddWithValue("TELEFONEID", telefoneId);
                 //    cmd.ExecuteScalar();
                 //}
+            }
+        }
+
+        public bool DeletarPessoa(Int64 cpf)
+        {
+            var pessoa = new Pessoa();
+            int rowsAffected = -1;
+            using (SqlConnection conn = new SqlConnection(conexao))
+            {
+                conn.Open();
+                using (SqlCommand cmd = new SqlCommand("SELECT * FROM tb_pessoas WHERE Cpf = " + cpf, conn))
+                {
+                    cmd.CommandType = System.Data.CommandType.Text;
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader != null)
+                        {
+                            while (reader.Read())
+                            {
+                                pessoa.Id = (int?)reader["Id"];
+                            }
+                            reader.Close();
+                            reader.Dispose();
+                        }
+
+                        if (pessoa.Id == null)
+                        {
+                            return false;
+                        }
+
+                        using (SqlCommand deleteCmd = new SqlCommand("DELETE FROM tb_pessoas WHERE Cpf = @CPFDELETE", conn))
+                        {
+                            deleteCmd.CommandType = System.Data.CommandType.Text;
+                            deleteCmd.Parameters.AddWithValue("CPFDELETE", cpf);
+                            rowsAffected = deleteCmd.ExecuteNonQuery();
+                        }
+
+                        if (rowsAffected > 0)
+                        {
+                            return true;
+                        }
+                        return false;
+                    }
+                }
             }
         }
     }

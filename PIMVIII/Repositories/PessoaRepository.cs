@@ -12,18 +12,33 @@ namespace PIMVIII.Repositories
             _pessoaDao = new PessoaDao();
         }
 
-        public List<Pessoa> GetPessoas
+        public List<Pessoa> BuscarPessoas
         {
             get
             {
-                return _pessoaDao.ObterPessoas();
+                return _pessoaDao.BuscarPessoas();
             }
         }
 
-        public void InserirPessoa(PessoaEnderecoTelefone pessoa)
+        public Pessoa BuscarPessoaPorCpf(Int64 cpf)
         {
             {
-                _pessoaDao.InserirPessoa(pessoa);
+                return _pessoaDao.BuscarPessoaPorCpf(cpf);
+            }
+        }
+
+        public int InserirPessoa(PessoaEnderecoTelefone pessoa)
+        {
+            {
+                var pessoaId = _pessoaDao.InserirPessoa(pessoa);
+                return pessoaId;
+            }
+        }
+
+        public bool DeletarPessoa(Int64 cpf)
+        {
+            {
+                return _pessoaDao.DeletarPessoa(cpf);
             }
         }
     }
