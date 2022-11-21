@@ -34,7 +34,7 @@ namespace PIMVIII.Controllers
         }
 
         [HttpPost]
-        public ActionResult<Pessoa> Post([FromBody] PessoaEnderecoTelefone pessoa)
+        public ActionResult<Pessoa> InserirPessoa([FromBody] PessoaEnderecoTelefone pessoa)
         {
             var pessoaId = _pessoaRepository.InserirPessoa(pessoa);
             if (pessoaId < 0)
@@ -52,6 +52,18 @@ namespace PIMVIII.Controllers
         {
             var isDeleted = _pessoaRepository.DeletarPessoa(cpf);
             if (isDeleted)
+            {
+                return NoContent();
+            }
+            return NotFound("Não foi encontrada nenhuma pessoa cadastrada com o CPF informado");
+        }
+
+
+        [HttpPut("{cpf}")]
+        public ActionResult<Pessoa> AlterarPessoa(Int64 cpf, [FromBody] PessoaEnderecoTelefone pessoa)
+        {
+            var isChanged = _pessoaRepository.AlterarPessoa(cpf, pessoa);
+            if (isChanged)
             {
                 return NoContent();
             }

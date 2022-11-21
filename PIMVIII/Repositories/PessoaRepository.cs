@@ -41,5 +41,12 @@ namespace PIMVIII.Repositories
                 return _pessoaDao.DeletarPessoa(cpf);
             }
         }
+
+        public bool AlterarPessoa(Int64 cpf, PessoaEnderecoTelefone pessoa)
+        {
+            {
+                return _pessoaDao.AlterarPessoa(cpf, pessoa);
+            }
+        }
     }
 }

@@ -303,5 +303,124 @@ namespace PIMVIII.Dao
                 }
             }
         }
+
+        public bool AlterarPessoa(Int64 cpf, PessoaEnderecoTelefone pessoa)
+        {
+            int tipoTelefoneId = -1;
+            int pessoaId = -1;
+            int telefoneId = -1;
+            int enderecoId = -1;
+            using (SqlConnection conn = new SqlConnection(conexao))
+            {
+                conn.Open();
+
+                SqlCommand command = conn.CreateCommand();
+                SqlTransaction transaction;
+
+                transaction = conn.BeginTransaction();
+
+                command.Connection = conn;
+                command.Transaction = transaction;
+
+                try
+                {
+                    command.CommandText = "SELECT * FROM tb_pessoas WHERE Cpf = @CPF";
+                    command.Parameters.AddWithValue("CPF", cpf);
+                    SqlDataReader readerPessoa = command.ExecuteReader();
+
+                    if (readerPessoa != null)
+                    {
+                        while (readerPessoa.Read())
+                        {
+                            pessoaId = (int)readerPessoa["Id"];
+                            enderecoId = (int)readerPessoa["EnderecoId"];
+                        }
+                        readerPessoa.Close();
+                        readerPessoa.Dispose();
+                    }
+
+                    if (pessoaId == -1)
+                    {
+                        throw new Exception("CPF não cadastrado");
+                    }
+
+                    command.CommandText = "SELECT * FROM tb_tipos_telefone WHERE Tipo = @TIPOTELEFONE";
+                    command.Parameters.AddWithValue("TIPOTELEFONE", pessoa.TipoTelefone);
+                    SqlDataReader readerTiposTelefone = command.ExecuteReader();
+
+                    if (readerTiposTelefone != null)
+                    {
+                        while (readerTiposTelefone.Read())
+                        {
+                            tipoTelefoneId = (int)readerTiposTelefone["Id"];
+                        }
+                        readerTiposTelefone.Close();
+                        readerTiposTelefone.Dispose();
+                    }
+
+                    if (tipoTelefoneId == -1)
+                    {
+                        command.CommandText = "INSERT INTO tb_tipos_telefone (Tipo) output INSERTED.ID VALUES (@TIPOTELEFONEINSERT)";
+                        command.Parameters.AddWithValue("TIPOTELEFONEINSERT", pessoa.TipoTelefone);
+                        tipoTelefoneId = (int)command.ExecuteScalar();
+                    }
+
+                    command.CommandText = "SELECT * FROM tb_pessoa_telefone WHERE PessoaId = @PESSOAID";
+                    command.Parameters.AddWithValue("PESSOAID", pessoaId);
+                    SqlDataReader readerPessoaTelefone = command.ExecuteReader();
+
+                    if (readerPessoaTelefone != null)
+                    {
+                        while (readerPessoaTelefone.Read())
+                        {
+                            telefoneId = (int)readerPessoaTelefone["TelefoneId"];
+                        }
+                        readerPessoaTelefone.Close();
+                        readerPessoaTelefone.Dispose();
+                    }
+
+                    command.CommandText = "UPDATE tb_telefones SET Numero = @NUMEROTELEFONE, Ddd = @DDD WHERE Id = @TELEFONEID";
+                    command.Parameters.AddWithValue("NUMEROTELEFONE", pessoa.NumeroTelefone);
+                    command.Parameters.AddWithValue("DDD", pessoa.Ddd);
+                    command.Parameters.AddWithValue("TELEFONEID", telefoneId);
+                    command.ExecuteScalar();
+                    
+                    command.CommandText = "UPDATE tb_enderecos SET Logradouro = @LOGRADOURO, Numero = @NUMERO, Cep = @CEP, Bairro = @BAIRRO, Cidade = @CIDADE, Estado = @ESTADO WHERE Id = @ENDERECOID";
+                    command.Parameters.AddWithValue("LOGRADOURO", pessoa.Logradouro);
+                    command.Parameters.AddWithValue("NUMERO", pessoa.Numero);
+                    command.Parameters.AddWithValue("CEP", pessoa.Cep);
+                    command.Parameters.AddWithValue("BAIRRO", pessoa.Bairro);
+                    command.Parameters.AddWithValue("CIDADE", pessoa.Cidade);
+                    command.Parameters.AddWithValue("ESTADO", pessoa.Estado);
+                    command.Parameters.AddWithValue("ENDERECOID", enderecoId);
+                    command.ExecuteScalar();
+
+                    command.CommandText = "UPDATE tb_pessoas SET Nome = @NOME, Cpf = @CPFUPDATE WHERE Id = @PESSOAIDUPDATE";
+                    command.Parameters.AddWithValue("NOME", pessoa.Nome);
+                    command.Parameters.AddWithValue("CPFUPDATE", pessoa.Cpf);
+                    command.Parameters.AddWithValue("PESSOAIDUPDATE", pessoaId);
+                    command.ExecuteScalar();
+
+                    transaction.Commit();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Commit Exception Type: {0}", ex.GetType());
+                    Console.WriteLine("  Message: {0}", ex.Message);
+
+                    try
+                    {
+                        transaction.Rollback();
+                    }
+                    catch (Exception ex2)
+                    {
+                        Console.WriteLine("Rollback Exception Type: {0}", ex2.GetType());
+                        Console.WriteLine("  Message: {0}", ex2.Message);
+                    }
+                    return false;
+                }
+            }
+        }
     }
 }
